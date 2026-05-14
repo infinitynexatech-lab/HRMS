@@ -76,6 +76,18 @@ def _system_settings():
     if frappe.db.get_default("desktop:home_page") == "setup-wizard":
         frappe.db.set_default("desktop:home_page", "workspace")
 
+    # Frappe v15 ALSO checks `Installed Application.is_setup_complete`
+    # per-app to decide whether the JS router should re-route /setup-wizard
+    # → /app. `frappe.is_setup_complete()` returns True only when EVERY
+    # row for {frappe, erpnext} has is_setup_complete=1. Without this,
+    # boot.sysdefaults.setup_complete=False, the router forces every
+    # user back to /app/setup-wizard, and the wizard's API call to
+    # frappe.desk.desk_page.getpage 403s for non-System-Managers.
+    frappe.db.sql(
+        "UPDATE `tabInstalled Application` SET is_setup_complete = 1 "
+        "WHERE app_name IN ('frappe', 'erpnext', 'hrms', 'infinity_hrms')"
+    )
+
 
 def _website_theme():
     """Indigo theme (matches Infinity CRM #6366F1) applied via a Website
