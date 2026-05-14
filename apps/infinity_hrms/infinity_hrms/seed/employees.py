@@ -10,7 +10,7 @@ from frappe.utils import getdate
 
 from .company import COMPANY
 from .holidays import HOLIDAY_LIST
-from .payroll_india import STRUCTURE_NAME
+from .payroll_india import STRUCTURE_NAME, INCOME_TAX_SLAB
 
 
 # (first, last, gender, dept, designation, joining_date, base_ctc_per_month)
@@ -100,5 +100,7 @@ def seed_salary_assignments():
         doc.from_date = getdate(doj)
         doc.base = ctc
         doc.company = COMPANY
+        # Required when the structure has a TDS (income tax) component
+        doc.income_tax_slab = INCOME_TAX_SLAB
         doc.insert(ignore_permissions=True)
         doc.submit()

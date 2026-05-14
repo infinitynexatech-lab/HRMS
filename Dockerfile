@@ -31,8 +31,14 @@ WORKDIR /home/frappe/frappe-bench
 # `bench get-app` clones the repo into apps/<name> and pip-installs it
 # into the bench's venv. Branch must match the frappe/erpnext base or
 # you will get a "frappe version mismatch" error at runtime.
-RUN bench get-app --branch ${FRAPPE_VERSION} https://github.com/frappe/payments \
- && bench get-app --branch ${FRAPPE_VERSION} https://github.com/frappe/hrms
+#
+# --skip-assets is critical: without it, get-app auto-runs `bench build
+# --app <name>` per app, which fails when later apps haven't been
+# installed yet (the build sees all .bundle.js files but only some
+# apps' Python imports are resolvable). We do ONE bench build at the
+# end, matching frappe_docker's official pattern.
+RUN bench get-app --skip-assets --branch ${FRAPPE_VERSION} https://github.com/frappe/payments \
+ && bench get-app --skip-assets --branch ${FRAPPE_VERSION} https://github.com/frappe/hrms
 
 # ── Add our white-label app ──────────────────────────────────────────
 # Copy first, then pip-install editable so `bench build` finds it on
@@ -40,10 +46,46 @@ RUN bench get-app --branch ${FRAPPE_VERSION} https://github.com/frappe/payments 
 COPY --chown=frappe:frappe apps/infinity_hrms apps/infinity_hrms
 RUN env/bin/pip install --no-cache-dir -e apps/infinity_hrms
 
+# ── Install node deps for newly-added apps ───────────────────────────
+# bench get-app --skip-assets does not run yarn install in the new
+# apps' folders. bench setup requirements --node walks every app in
+# sites/apps.txt and runs yarn install. Without it, bench build fails
+# with "yarn run production --run-build-command exit 1" because
+# node_modules don't exist for hrms / payments / infinity_hrms.
+RUN bench setup requirements --node
+
+# ── Pre-seed common_site_config.json for the HR PWA build ────────────
+# Frappe HR ships a separate Vue 3 PWA frontend at apps/hrms/frontend/
+# whose socket.js does:
+#   import { socketio_port } from ".../sites/common_site_config.json"
+# This is a NAMED JSON import (Rollup style) that requires the key to
+# exist at build time. In production this file is written by the
+# `configurator` service at runtime, not at image-build time, so we
+# pre-seed the minimum vite needs. The runtime configurator's
+# `bench set-config -g` calls merge into this file, preserving keys.
+RUN node -e "const fs=require('fs');const p='sites/common_site_config.json';const c=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{};c.socketio_port=9000;fs.writeFileSync(p,JSON.stringify(c,null,2));"
+
 # ── Rebuild asset bundle ─────────────────────────────────────────────
 # Frappe compiles a single CSS/JS bundle at build time. Without this
 # step our infinity_hrms.css would 404 in the browser.
 # --production minifies + adds cache-bust hashes.
 RUN bench build --production
+
+# ── Link per-app public/ dirs into the BAKED assets path ─────────────
+# The base image's /usr/local/bin/entrypoint.sh runs on every container
+# start and does:
+#   rm -rf /home/frappe/frappe-bench/sites/assets
+#   ln -s /home/frappe/frappe-bench/assets /home/frappe/frappe-bench/sites/assets
+# So `sites/assets/` at runtime is a symlink to /home/frappe/frappe-bench/assets/,
+# the BAKED dir embedded in the image — NOT the runtime sites/ volume.
+# Our per-app symlinks must be created in the baked dir at image-build
+# time so they exist for every container that starts from this image
+# (especially the frontend, which nginx serves from).
+# The base image already has links for frappe + erpnext; we add the
+# three we layered on. `ln -sfn` is idempotent so safe to re-run.
+RUN for app in payments hrms infinity_hrms; do \
+      ln -sfn /home/frappe/frappe-bench/apps/$app/$app/public \
+              /home/frappe/frappe-bench/assets/$app; \
+    done
 
 # The base image's CMD (supervisord + nginx + gunicorn) is reused as-is.

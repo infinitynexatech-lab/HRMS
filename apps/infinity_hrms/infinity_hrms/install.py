@@ -77,7 +77,9 @@ def _website_theme():
 
     theme.custom_scss = _scss()
     theme.button_rounded_corners = 1
-    theme.flags = {"ignore_validate": True}
+    # NB: assign attribute on flags (a frappe._dict). Replacing the
+    # whole flags dict breaks downstream `self.flags.in_print` access.
+    theme.flags.ignore_validate = True
     theme.save(ignore_permissions=True)
 
     # Set as default for the site

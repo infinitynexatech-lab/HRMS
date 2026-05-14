@@ -183,7 +183,11 @@ services:
     ports:
       - "${HOST_PORT:-8080}:8080"
     volumes:
-      - sites:/home/frappe/frappe-bench/sites:ro
+      # NB: rw, not ro — nginx-entrypoint.sh re-links sites/assets on
+      # every start, which fails on a read-only mount with
+      # "rm: cannot remove '...sites/assets': Read-only file system"
+      # in a restart loop.
+      - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
 
 volumes:

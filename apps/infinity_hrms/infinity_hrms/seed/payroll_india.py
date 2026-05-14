@@ -26,9 +26,21 @@ import frappe
 from .company import COMPANY
 
 STRUCTURE_NAME = "India Standard Structure"
+INCOME_TAX_SLAB = "India FY26-27 New Regime"
 PT_AMOUNT = 200  # ₹/month — adjust per state
 EPF_BASIC_CAP = 15000
 ESIC_GROSS_CAP = 21000
+
+# India FY 2026-27 New Regime slabs (₹). Standard deduction ₹75,000.
+# 87A rebate covers tax up to ₹12L (effectively 0% tax under ₹12L).
+NEW_REGIME_SLABS = [
+    (0,       300_000,  0),
+    (300_000, 700_000,  5),
+    (700_000, 1_000_000, 10),
+    (1_000_000, 1_200_000, 15),
+    (1_200_000, 1_500_000, 20),
+    (1_500_000, 0,         30),  # 0 to_amount means open-ended
+]
 
 
 COMPONENTS = [
@@ -132,7 +144,34 @@ def seed_salary_components_india():
         doc.insert(ignore_permissions=True)
 
 
+def seed_income_tax_slab():
+    """India FY26-27 New Regime tax slab. Required by Salary Structure
+    Assignment when the structure has a TDS (income tax) component."""
+    if frappe.db.exists("Income Tax Slab", INCOME_TAX_SLAB):
+        return
+
+    doc = frappe.new_doc("Income Tax Slab")
+    doc.name = INCOME_TAX_SLAB
+    doc.effective_from = "2026-04-01"
+    doc.company = COMPANY
+    doc.currency = "INR"
+    doc.standard_tax_exemption_amount = 75000  # standard deduction
+    doc.disabled = 0
+
+    for from_amt, to_amt, percent in NEW_REGIME_SLABS:
+        row = doc.append("slabs", {})
+        row.from_amount = from_amt
+        if to_amt:
+            row.to_amount = to_amt
+        row.percent_deduction = percent
+
+    doc.flags.ignore_validate = True
+    doc.insert(ignore_permissions=True)
+    doc.submit()
+
+
 def seed_salary_structure_india():
+    seed_income_tax_slab()
     if frappe.db.exists("Salary Structure", STRUCTURE_NAME):
         return
 
