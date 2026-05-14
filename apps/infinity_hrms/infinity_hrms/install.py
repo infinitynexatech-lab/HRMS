@@ -66,6 +66,16 @@ def _system_settings():
     ss.setup_complete = 1
     ss.save(ignore_permissions=True)
 
+    # Fresh Frappe installs set `desktop:home_page = setup-wizard` in the
+    # global Defaults table, and that override BEATS System Settings.
+    # setup_complete. Even after we flag setup_complete=1, every login
+    # still redirects to /app/setup-wizard until this default is cleared.
+    # Symptom we saw: post-login users land on /app/setup-wizard which
+    # blocks Workspace API calls (frappe.desk.desk_page.getpage → 403)
+    # and shows "Not permitted".
+    if frappe.db.get_default("desktop:home_page") == "setup-wizard":
+        frappe.db.set_default("desktop:home_page", "workspace")
+
 
 def _website_theme():
     """Indigo theme (matches Infinity CRM #6366F1) applied via a Website
