@@ -16,6 +16,12 @@ from .leave import seed_leave_types
 from .payroll_india import seed_salary_components_india, seed_salary_structure_india
 from .employees import seed_employees, seed_salary_assignments
 from .users import seed_demo_users
+from .hierarchy import seed_hierarchy
+from .leave_policy import seed_leave_setup
+from .recruitment import seed_recruitment
+from .workflow import seed_pending_leave
+from .attendance import seed_attendance
+from .payroll_run import seed_payroll_run
 
 
 COMPANY = "Infinity Nexatech Pvt Ltd"
@@ -35,5 +41,11 @@ def run_all():
     seed_employees()
     seed_salary_assignments()
     seed_demo_users()
+    seed_hierarchy()
+    seed_leave_setup()
+    seed_recruitment()
+    seed_pending_leave()
+    seed_attendance()
+    seed_payroll_run()
     frappe.db.commit()
     print("✓ Infinity HRMS demo seed complete")
