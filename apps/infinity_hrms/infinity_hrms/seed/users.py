@@ -17,29 +17,36 @@ Idempotent — running twice updates passwords + roles to match the spec.
 import frappe
 
 
+# NB: every user gets "Employee Self Service" — that's the role that
+# actually grants Desk read access for the self-service portal (My
+# Leave, My Attendance, My Payslip, My Profile). The bare "Employee"
+# role is a permission anchor (linking user → Employee record) but
+# does NOT grant read on the Employee doctype itself. A user with just
+# "Employee" can log in but lands on a "Not permitted" wall.
+
 DEMO_USERS = [
     {
         "email": "divya.menon@infinitynexatech.com",
         "password": "DemoHR@2026",
-        "roles": ["HR Manager", "HR User", "Leave Approver", "Employee"],
+        "roles": ["HR Manager", "HR User", "Leave Approver", "Employee", "Employee Self Service"],
         "persona": "HR Lead",
     },
     {
         "email": "arjun.sharma@infinitynexatech.com",
         "password": "DemoVP@2026",
-        "roles": ["Employee", "Leave Approver", "Expense Approver"],
+        "roles": ["Employee", "Employee Self Service", "Leave Approver", "Expense Approver"],
         "persona": "Engineering VP",
     },
     {
         "email": "priya.iyer@infinitynexatech.com",
         "password": "DemoMgr@2026",
-        "roles": ["Employee", "Leave Approver"],
+        "roles": ["Employee", "Employee Self Service", "Leave Approver"],
         "persona": "Engineering Manager",
     },
     {
         "email": "karthik.nair@infinitynexatech.com",
         "password": "DemoEmp@2026",
-        "roles": ["Employee"],
+        "roles": ["Employee", "Employee Self Service"],
         "persona": "Software Engineer (IC)",
     },
     {
@@ -49,7 +56,7 @@ DEMO_USERS = [
         # ATS access without HR Manager's wider payroll/employee writes.
         "email": "tanya.saxena@infinitynexatech.com",
         "password": "DemoRec@2026",
-        "roles": ["HR User", "Interviewer", "Employee"],
+        "roles": ["HR User", "Interviewer", "Employee", "Employee Self Service"],
         "persona": "Recruiter / Content Lead",
     },
 ]
