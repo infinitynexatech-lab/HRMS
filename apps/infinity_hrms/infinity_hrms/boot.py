@@ -5,7 +5,7 @@ document.title before the user notices the default 'Frappe' flash."""
 
 def extend_bootinfo(bootinfo):
     bootinfo.infinity_hrms = {
-        "brand": "Infinity HRMS",
+        "brand": "Infinity Suite",
         "publisher": "Infinity Nexatech",
         "primary_color": "#6366F1",
         "support_email": "support@infinitynexatech.com",

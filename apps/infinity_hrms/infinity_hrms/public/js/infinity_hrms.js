@@ -1,11 +1,11 @@
-// Infinity HRMS — client-side brand finalization.
+// Infinity Suite — client-side brand finalization.
 //
 // Loaded into Desk and Web via hooks.py. Runs on every page load.
 
 (function () {
   "use strict";
 
-  const BRAND = "Infinity HRMS";
+  const BRAND = "Infinity Suite";
 
   // 1. Set window title BEFORE Frappe's default flashes.
   //    Frappe sets document.title from app_title in hooks, but on slow

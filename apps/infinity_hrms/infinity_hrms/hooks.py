@@ -5,9 +5,9 @@ from . import __version__ as app_version  # noqa: F401
 # dialogs, and in the <title> tag of every page Frappe renders. The
 # `app_title` is what the browser tab actually shows.
 app_name = "infinity_hrms"
-app_title = "Infinity HRMS"
+app_title = "Infinity Suite"
 app_publisher = "Infinity Nexatech"
-app_description = "White-label HRMS by Infinity Nexatech, built on Frappe HR"
+app_description = "Infinity Suite — HR, Payroll, CRM, Accounting on one platform, by Infinity Nexatech"
 app_email = "support@infinitynexatech.com"
 app_license = "MIT"
 required_apps = ["hrms"]
@@ -33,7 +33,7 @@ web_include_js = "/assets/infinity_hrms/js/infinity_hrms.js"
 website_context = {
     "favicon": "/assets/infinity_hrms/images/favicon.svg",
     "splash_image": "/assets/infinity_hrms/images/logo.svg",
-    "brand_html": "Infinity HRMS",
+    "brand_html": "Infinity Suite",
 }
 
 # ── Lifecycle hooks ──────────────────────────────────────────────────

@@ -3,13 +3,13 @@
 import frappe
 
 
-BRAND_NAME = "Infinity HRMS"
+BRAND_NAME = "Infinity Suite"
 BRAND_HTML = (
     '<span style="display:inline-flex;align-items:center;gap:.5rem;'
     'font-weight:700;letter-spacing:.02em;">'
     '<img src="/assets/infinity_hrms/images/logo-mark.svg" '
     'style="height:20px;width:20px;" alt=""/>'
-    "Infinity HRMS</span>"
+    "Infinity Suite</span>"
 )
 LOGO_URL = "/assets/infinity_hrms/images/logo.svg"
 FAVICON_URL = "/assets/infinity_hrms/images/favicon.svg"
