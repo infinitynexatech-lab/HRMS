@@ -65,11 +65,26 @@ RUN bench setup requirements --node
 # `bench set-config -g` calls merge into this file, preserving keys.
 RUN node -e "const fs=require('fs');const p='sites/common_site_config.json';const c=fs.existsSync(p)?JSON.parse(fs.readFileSync(p)):{};c.socketio_port=9000;fs.writeFileSync(p,JSON.stringify(c,null,2));"
 
-# ── Rebuild asset bundle ─────────────────────────────────────────────
-# Frappe compiles a single CSS/JS bundle at build time. Without this
-# step our infinity_hrms.css would 404 in the browser.
-# --production minifies + adds cache-bust hashes.
-RUN bench build --production
+# ── Build all assets + sync the manifest into the baked dir ──────────
+# Frappe compiles JS/CSS bundles at build time and writes:
+#   - bundle FILES to apps/<app>/<app>/public/dist/<type>/<bundle>.<hash>.<ext>
+#     (persists — apps/ is not a volume)
+#   - manifest to sites/assets/assets.json
+#     (DISCARDED — sites/ is declared VOLUME in the base image, so
+#     build-time writes there don't persist into the final image)
+#
+# Meanwhile the entrypoint at runtime replaces `sites/assets` with a
+# symlink to `/home/frappe/frappe-bench/assets/` (the BAKED dir), so
+# at runtime Frappe reads the manifest from the baked location.
+#
+# Symptom of getting this wrong: every desk page renders as plain
+# unstyled HTML, because the manifest points to <hash>.css but only
+# the OLD-hash files exist on disk. The fix is to copy the freshly
+# written manifest from sites/assets/ to the baked dir so it matches
+# the on-disk bundle filenames.
+RUN bench build --production \
+ && cp sites/assets/assets.json     /home/frappe/frappe-bench/assets/assets.json \
+ && cp sites/assets/assets-rtl.json /home/frappe/frappe-bench/assets/assets-rtl.json
 
 # ── Link per-app public/ dirs into the BAKED assets path ─────────────
 # The base image's /usr/local/bin/entrypoint.sh runs on every container

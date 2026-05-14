@@ -55,12 +55,15 @@ def _navbar_settings():
 
 
 def _system_settings():
-    """System-wide niceties: country defaults, currency, language."""
+    """System-wide niceties: country defaults, currency, language.
+    Also marks setup_complete=1 so the Frappe setup wizard does not
+    intercept logins for our pre-seeded site."""
     ss = frappe.get_single("System Settings")
     ss.country = ss.country or "India"
     ss.language = ss.language or "en"
     ss.time_zone = ss.time_zone or "Asia/Kolkata"
     ss.currency = ss.currency or "INR"
+    ss.setup_complete = 1
     ss.save(ignore_permissions=True)
 
 
