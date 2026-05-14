@@ -1,0 +1,86 @@
+# Infinity HRMS — co-hosted deployment overlay.
+#
+# Use INSTEAD of docker-compose.prod.yml when an EXTERNAL Caddy
+# (e.g. the Infinity CRM stack's bundled Caddy) is going to terminate
+# TLS for hrms.infinitynexatech.com and reverse-proxy to this stack.
+#
+# Bring up:
+#   docker network create infinity-proxy   # one-time, host-wide
+#   docker compose -f docker-compose.yml -f docker-compose.co-host.yml up -d
+#
+# Prereq the external Caddy needs:
+#   1. Joined to the `infinity-proxy` network
+#   2. Caddyfile contains a server block:
+#        hrms.infinitynexatech.com {
+#          reverse_proxy hrms-frontend:8080 {
+#            header_up X-Forwarded-Proto https
+#            header_up X-Real-IP {remote_host}
+#          }
+#        }
+#
+# Why this isn't docker-compose.prod.yml: that overlay includes its
+# own bundled Caddy + binds host :80 and :443, which conflicts with
+# the CRM's existing Caddy.
+
+networks:
+  # HRMS's private compose network — backend, mariadb, redis, workers
+  # talk to each other on this. Auto-created by compose.
+  default:
+  # Shared network reachable by external Caddy and any other co-hosted
+  # product. Must exist before `up`: docker network create infinity-proxy
+  infinity-proxy:
+    external: true
+
+services:
+  frontend:
+    container_name: hrms-frontend
+    # Drop host port mapping — Caddy reaches the container via the
+    # shared Docker network. No public ingress from this stack.
+    ports: !reset []
+    networks:
+      default: {}
+      infinity-proxy:
+        aliases:
+          # Caddy's reverse_proxy upstream is `hrms-frontend:8080`;
+          # this alias guarantees that DNS resolves regardless of the
+          # compose project name (in case someone clones to a different
+          # directory and the auto-derived container name changes).
+          - hrms-frontend
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${DOMAIN}
+      # Trust the X-Forwarded-For from the upstream Caddy. 0.0.0.0/0
+      # is fine because only Caddy is on infinity-proxy with us — no
+      # untrusted ingress reaches frontend directly.
+      UPSTREAM_REAL_IP_ADDRESS: 0.0.0.0/0
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "on"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 100m
+
+  # In production the site name must match the public domain so
+  # Frappe routes requests by Host header to the right site folder.
+  create-site:
+    environment:
+      SITE_NAME: ${DOMAIN}
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        wait-for-it -t 180 mariadb:3306;
+        if [ ! -d "sites/${DOMAIN}" ]; then
+          echo "→ Creating production site ${DOMAIN}";
+          bench new-site \
+            --no-mariadb-socket \
+            --admin-password=${ADMIN_PASSWORD} \
+            --db-root-password=${MARIADB_ROOT_PASSWORD} \
+            --install-app erpnext \
+            --install-app hrms \
+            --install-app infinity_hrms \
+            ${DOMAIN};
+          bench use ${DOMAIN};
+        fi
+
+  mariadb:
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
