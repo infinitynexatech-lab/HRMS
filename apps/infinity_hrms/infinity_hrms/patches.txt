@@ -1,0 +1,2 @@
+# Migration patches run by `bench migrate` in order.
+# One patch entry per line:  infinity_hrms.patches.v0_1.<patch_module>

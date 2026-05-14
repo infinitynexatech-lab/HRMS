@@ -1,0 +1,193 @@
+# Infinity HRMS — local development stack.
+#
+# Bring up:        docker compose up -d
+# Tail logs:       docker compose logs -f backend
+# Reset state:     docker compose down -v
+# Rebuild image:   docker compose build --no-cache
+#
+# After first `up`, open http://localhost:8080 and sign in as
+# Administrator with the ADMIN_PASSWORD from .env.
+#
+# Architecture (single host, Docker network):
+#   frontend (nginx) ──► backend (gunicorn) ──► mariadb
+#                    └─► websocket (socketio) ──► redis
+#   scheduler, queue-short, queue-long ──────────► redis
+#                                              └─► mariadb
+# Background services share the same image as backend, just with
+# different commands.
+
+x-backend-defaults: &backend-defaults
+  image: ${IMAGE:-infinity-hrms:dev}
+  build:
+    context: .
+    args:
+      FRAPPE_VERSION: ${FRAPPE_VERSION:-version-15}
+  restart: unless-stopped
+  environment:
+    - DB_HOST=mariadb
+    - DB_PORT=3306
+    - REDIS_CACHE=redis://redis:6379
+    - REDIS_QUEUE=redis://redis:6379
+    - REDIS_SOCKETIO=redis://redis:6379
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
+
+services:
+  # ── Datastores ────────────────────────────────────────────────────
+  mariadb:
+    image: mariadb:10.6
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -u root -p${MARIADB_ROOT_PASSWORD:-frappe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-frappe}
+    command:
+      # Frappe REQUIRES these MariaDB settings. Without them you get
+      # cryptic encoding errors during bench new-site.
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    volumes:
+      - mariadb-data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  # ── One-shot setup jobs ──────────────────────────────────────────
+  # Writes shared-config keys into common_site_config.json. Frappe
+  # services read this file at startup. Idempotent.
+  configurator:
+    <<: *backend-defaults
+    restart: "no"
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        ls -1 apps > sites/apps.txt
+        bench set-config -g db_host mariadb
+        bench set-config -gp db_port 3306
+        bench set-config -g redis_cache "redis://redis:6379"
+        bench set-config -g redis_queue "redis://redis:6379"
+        bench set-config -g redis_socketio "redis://redis:6379"
+        bench set-config -gp socketio_port 9000
+
+  # Creates the Frappe site if it doesn't exist + installs the three
+  # apps (erpnext, hrms, infinity_hrms). Idempotent: skips if dir exists.
+  create-site:
+    <<: *backend-defaults
+    restart: "no"
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+      mariadb:
+        condition: service_healthy
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        wait-for-it -t 120 mariadb:3306;
+        if [ ! -d "sites/${SITE_NAME:-localhost}" ]; then
+          echo "→ Creating site ${SITE_NAME:-localhost}";
+          bench new-site \
+            --no-mariadb-socket \
+            --admin-password=${ADMIN_PASSWORD:-admin} \
+            --db-root-password=${MARIADB_ROOT_PASSWORD:-frappe} \
+            --install-app erpnext \
+            --install-app hrms \
+            --install-app infinity_hrms \
+            ${SITE_NAME:-localhost};
+          bench --site ${SITE_NAME:-localhost} set-config developer_mode 1;
+          bench use ${SITE_NAME:-localhost};
+        else
+          echo "→ Site ${SITE_NAME:-localhost} already exists";
+        fi
+
+  # ── Long-running services ────────────────────────────────────────
+  backend:
+    <<: *backend-defaults
+    depends_on:
+      create-site:
+        condition: service_completed_successfully
+
+  websocket:
+    <<: *backend-defaults
+    command:
+      - node
+      - /home/frappe/frappe-bench/apps/frappe/socketio.js
+    depends_on:
+      backend:
+        condition: service_started
+
+  scheduler:
+    <<: *backend-defaults
+    command:
+      - bench
+      - schedule
+    depends_on:
+      backend:
+        condition: service_started
+
+  queue-short:
+    <<: *backend-defaults
+    command:
+      - bench
+      - worker
+      - --queue
+      - short,default
+    depends_on:
+      backend:
+        condition: service_started
+
+  queue-long:
+    <<: *backend-defaults
+    command:
+      - bench
+      - worker
+      - --queue
+      - long,default
+    depends_on:
+      backend:
+        condition: service_started
+
+  # Frontend = nginx + static assets. Shares image but runs the
+  # nginx-entrypoint.sh that ships in frappe/erpnext.
+  frontend:
+    image: ${IMAGE:-infinity-hrms:dev}
+    build:
+      context: .
+      args:
+        FRAPPE_VERSION: ${FRAPPE_VERSION:-version-15}
+    restart: unless-stopped
+    command:
+      - nginx-entrypoint.sh
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME:-localhost}
+      UPSTREAM_REAL_IP_ADDRESS: 127.0.0.1
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 50m
+    depends_on:
+      backend:
+        condition: service_started
+      websocket:
+        condition: service_started
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites:ro
+      - logs:/home/frappe/frappe-bench/logs
+
+volumes:
+  mariadb-data:
+  redis-data:
+  sites:
+  logs:

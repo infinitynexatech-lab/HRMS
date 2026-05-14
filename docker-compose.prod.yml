@@ -1,0 +1,74 @@
+# Infinity HRMS — production overlay.
+#
+# Use:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences vs docker-compose.yml:
+#   1. Frontend NO longer exposes :8080 to the host. Caddy reaches it
+#      on the internal Docker network and is the only thing bound to
+#      :80 / :443.
+#   2. Caddy service handles TLS via Let's Encrypt + HSTS.
+#   3. Site name uses ${DOMAIN} from .env so Frappe routes requests by
+#      Host header to the right site.
+#   4. CLIENT_MAX_BODY_SIZE bumped to 100m for resume/document uploads.
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN}
+    depends_on:
+      - frontend
+
+  frontend:
+    # Drop the host port mapping — Caddy is the public face now.
+    ports: !reset []
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      # Frappe matches the site folder under sites/ by Host header.
+      # In prod we use DOMAIN so the URL hrms.infinitynexatech.com
+      # resolves to sites/hrms.infinitynexatech.com/.
+      FRAPPE_SITE_NAME_HEADER: ${DOMAIN}
+      UPSTREAM_REAL_IP_ADDRESS: 0.0.0.0/0
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "on"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 100m
+
+  create-site:
+    environment:
+      SITE_NAME: ${DOMAIN}
+    entrypoint: ["bash", "-c"]
+    command:
+      - |
+        wait-for-it -t 180 mariadb:3306;
+        if [ ! -d "sites/${DOMAIN}" ]; then
+          echo "→ Creating production site ${DOMAIN}";
+          bench new-site \
+            --no-mariadb-socket \
+            --admin-password=${ADMIN_PASSWORD} \
+            --db-root-password=${MARIADB_ROOT_PASSWORD} \
+            --install-app erpnext \
+            --install-app hrms \
+            --install-app infinity_hrms \
+            ${DOMAIN};
+          bench use ${DOMAIN};
+          bench --site ${DOMAIN} set-config maintenance_mode 0;
+          bench --site ${DOMAIN} set-config pause_scheduler 0;
+        fi
+
+  mariadb:
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+
+volumes:
+  caddy-data:
+  caddy-config:

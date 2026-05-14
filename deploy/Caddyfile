@@ -1,0 +1,37 @@
+# Infinity HRMS — Caddy reverse proxy.
+#
+# Caddy handles:
+#   - HTTPS via Let's Encrypt (auto-renewal)
+#   - HSTS + security headers
+#   - HTTP→HTTPS redirect (default behavior)
+#   - gzip + zstd compression
+#
+# It forwards everything to the frontend service (Frappe's nginx) on
+# the internal Docker network. Frappe needs X-Forwarded-Proto and
+# X-Real-IP to generate correct absolute URLs and to log accurately.
+
+{$DOMAIN} {
+  encode gzip zstd
+
+  reverse_proxy frontend:8080 {
+    header_up X-Forwarded-Proto https
+    header_up X-Forwarded-Host  {host}
+    header_up X-Real-IP         {remote_host}
+  }
+
+  header {
+    -Server
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options    "nosniff"
+    X-Frame-Options           "SAMEORIGIN"
+    Referrer-Policy           "strict-origin-when-cross-origin"
+    Permissions-Policy        "geolocation=(self), camera=(self), microphone=(self)"
+  }
+
+  # Frappe occasionally emits 502 during long migrations. Don't pin a
+  # downstream that's still booting.
+  @maintenance status 502
+  handle_response @maintenance {
+    respond "Infinity HRMS is updating, please refresh in a moment." 503
+  }
+}

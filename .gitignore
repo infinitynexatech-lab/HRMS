@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Frappe state (only present if running bench outside Docker)
+sites/
+logs/
+config/
+archived/
+
+# Python / Node build artifacts
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+node_modules/
+.npm/
+dist/
+build/
+
+# OS junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/

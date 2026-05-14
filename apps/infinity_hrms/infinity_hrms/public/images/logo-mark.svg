@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Infinity">
+  <defs>
+    <linearGradient id="infMark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#312E81"/>
+    </linearGradient>
+  </defs>
+  <path d="M14 32 C14 18, 30 18, 32 32 C34 46, 50 46, 50 32 C50 18, 34 18, 32 32 C30 46, 14 46, 14 32 Z"
+        fill="none" stroke="url(#infMark)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,85 @@
+/* Infinity HRMS — global brand overrides.
+ *
+ * Loaded into BOTH the Desk (admin app) and the public Website by
+ * hooks.py via app_include_css + web_include_css.
+ *
+ * The Website Theme SCSS in install.py covers SCSS variables that
+ * Frappe compiles on bench build. The CSS in this file covers anything
+ * that needs to win regardless of build state (uses !important against
+ * Frappe's default inline styles).
+ */
+
+:root {
+  --inx-primary: #6366F1;
+  --inx-primary-dark: #4F46E5;
+  --inx-primary-darker: #312E81;
+  --inx-primary-tint: #E0E7FF;
+  --inx-success: #10B981;
+  --inx-warning: #F59E0B;
+  --inx-danger: #EF4444;
+  --inx-text: #0F172A;
+  --inx-muted: #64748B;
+  --inx-bg: #F8FAFC;
+  --inx-card-bg: #FFFFFF;
+}
+
+/* Override Frappe's CSS variable system (Desk uses --primary etc.) */
+:root,
+[data-theme-mode="light"],
+.fp-light {
+  --primary: var(--inx-primary) !important;
+  --primary-color: var(--inx-primary) !important;
+  --btn-primary: var(--inx-primary) !important;
+  --bg-color: var(--inx-bg) !important;
+  --navbar-bg: var(--inx-card-bg) !important;
+  --sidebar-bg: var(--inx-card-bg) !important;
+}
+
+[data-theme-mode="dark"],
+.fp-dark {
+  --primary: #818CF8 !important;
+  --primary-color: #818CF8 !important;
+  --btn-primary: #818CF8 !important;
+  --bg-color: #0F172A !important;
+  --navbar-bg: #1E293B !important;
+  --sidebar-bg: #0F172A !important;
+}
+
+/* Primary buttons get a subtle gradient like the CRM */
+.btn-primary,
+.btn.btn-primary {
+  background: linear-gradient(135deg, var(--inx-primary), var(--inx-primary-dark)) !important;
+  border-color: var(--inx-primary-dark) !important;
+}
+.btn-primary:hover,
+.btn.btn-primary:hover {
+  background: linear-gradient(135deg, var(--inx-primary-dark), var(--inx-primary-darker)) !important;
+}
+
+/* Sidebar active item — make the indigo strong */
+.standard-sidebar-item.selected,
+.desk-sidebar-item.selected {
+  background: var(--inx-primary-tint) !important;
+  color: var(--inx-primary-dark) !important;
+  border-left-color: var(--inx-primary) !important;
+}
+
+/* Login page background — gradient identical to Infinity CRM */
+body.login-page,
+body.no-sidebar {
+  background: linear-gradient(135deg, #6366F1 0%, #4F46E5 50%, #312E81 100%) !important;
+  background-attachment: fixed !important;
+}
+
+/* Login card */
+.for-login,
+.login-content {
+  border-radius: 16px !important;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25) !important;
+}
+
+/* Hide upstream "Frappe" wordmark on login if it slips through */
+.login-content img.app-logo[src*="frappe"],
+.login-content img[src*="frappe-framework"] {
+  display: none !important;
+}
