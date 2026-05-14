@@ -85,11 +85,13 @@ def _website_theme():
     theme.flags.ignore_validate = True
     theme.save(ignore_permissions=True)
 
-    # Set as default for the site
-    ws = frappe.get_single("Website Settings")
-    if hasattr(ws, "website_theme"):
-        ws.website_theme = name
-        ws.save(ignore_permissions=True)
+    # set_as_default() does three things we can't do by hand:
+    #   1. Compiles custom_scss → /files/website_theme/<name>_<hash>.css
+    #   2. Updates Website Settings.website_theme to point at this record
+    #   3. Caches the compiled CSS path so web.html renders <link href>
+    # Skipping this leaves the rendered HTML with <link href="None"> for
+    # the website theme stylesheet, which breaks the portal navbar/layout.
+    theme.set_as_default()
 
 
 def _scss():
